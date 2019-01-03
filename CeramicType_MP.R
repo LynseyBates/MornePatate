@@ -6,6 +6,7 @@ setwd("E:/MP/MornePatate-master/MornePatate-master/AI")
 require(RPostgreSQL)
 library(tidyr)
 library(dplyr)
+library(ggplot2)
 
 # tell DBI which driver to use
 pgSQL <- dbDriver("PostgreSQL")
@@ -78,8 +79,7 @@ GlassX$Block[GlassX$Block == 'BlockF'] <- 'BlockFG'
 GlassX$Block[GlassX$Block == 'BlockG'] <- 'BlockFG'
 
 # Summarize by unit
-GlassSum <- GlassX %>% group_by(ProjectID,Block,DAACSPhase) %>% summarise_at("WBGSum", sum)
-
+GlassSum <- GlassX %>% group_by(ProjectID,Block,DAACSPhase) %>% summarise_at("WBGSum", sum) 
 
 ### B. Ware Data ############
 # submit a SQL query: note the use of \ as an escape sequence
@@ -233,30 +233,42 @@ WaresUnit$type[WaresUnit$type == 'Fulham Type'] <- 'OtherUtil'
 
 ### C. Add 0 counts
 # Create DF for calculating AIs
-WaresUnitAI <-WaresUnit %>% group_by(ProjectID, type, Block, DAACSPhase) %>% summarise(count = sum(Quantity))
 
-WaresUnitAI_type <- filter(WaresUnitAI, type %in% c('FrenchUtil', 'OtherUtil', 'LocalUtil', 'LateRefined','EarlyRefined' ))
+WaresUnitAI <-WaresUnit %>% group_by(ProjectID, type, Block, DAACSPhase) %>%
+  
+  summarise(count = sum(Quantity)) %>%
+  
+  spread(key=type, value=count,  fill=0, drop=F)
 
-WaresUnitAI_type2 <- WaresUnitAI_type %>% expand(ProjectID, type, Block, DAACSPhase)
+WaresUnitAI_type <- WaresUnitAI %>% select(ProjectID, Block,DAACSPhase, FrenchUtil, OtherUtil, LocalUtil, LateRefined, EarlyRefined)
 
-WaresUnitAI_type3 <- merge(WaresUnitAI_type2, WaresUnitAI_type, by=c("Block","DAACSPhase", "ProjectID", "type"))
 
-### C. Merge Glass and Cerm data
+### C. Merge Glass and Cerm data ##########
 
 # Merge with Glass data
-WaresAI_glass <- merge(GlassSum, WaresUnitAI_type, by=c("Block","DAACSPhase", "ProjectID"))
+WaresAI_glass <- merge(GlassSum, WaresUnitAI_type, by=c("Block","DAACSPhase", "ProjectID"), all=T)
 
-#write.csv(WaresAI_glass, file='CeramicAIdata.csv')
+WaresAI_glass$DAACSPhase[WaresAI_glass$DAACSPhase == ''] <- NA
+WaresAI_glass$Block[WaresAI_glass$Block == ''] <- NA
 
-### D. Bring in MCD data
-WaresAI_glass$ProjPhase <- paste(WaresAI_glass$ProjectID, WaresAI_glass$DAACSPhase, sep="_")
+WaresAI_glass2 <- filter(WaresAI_glass, ! is.na(Block))
+WaresAI_glass3 <- filter(WaresAI_glass2, ! is.na(DAACSPhase))
+
+WaresAI_glass3$WBGSum[is.na(WaresAI_glass3$WBGSum)] <- 0
+
+
+### D. Bring in MCD data ##########
+WaresAI_glass3$ProjPhase <- paste(WaresAI_glass3$ProjectID, WaresAI_glass3$DAACSPhase, sep="_")
 dates <- read.csv("projMCD.csv", header=TRUE, stringsAsFactors = FALSE)
 
-WaresAI_mcd <- merge(dates, WaresAI_glass, by="ProjPhase")
+WaresAI_mcd <- merge(dates, WaresAI_glass3, by="ProjPhase")
 
 
-### E. Calculate AIs
-WaresAI_mcd <- WaresAI_mcd %>% mutate(total = count+WBGSum) %>% mutate(AI = count/total)
+### E. Early ##########
+
+early <- WaresAI_mcd %>% select(blueMCD, Block,DAACSPhase,WBGSum, EarlyRefined)
+
+early <- early %>% mutate(total = EarlyRefined+WBGSum) %>% mutate(AI = EarlyRefined/total)
 
 adjustedWaldCI<-function(count,total,alpha){
   nTilde <- total+4
@@ -270,14 +282,14 @@ adjustedWaldCI<-function(count,total,alpha){
 }
 
 #run function on all data
-wbgCI <- adjustedWaldCI(WaresAI_mcd$count,WaresAI_mcd$total,0.05)
-WaresAI_mcd$gCIUpper <- wbgCI$upperCL
-WaresAI_mcd$gCILower <- wbgCI$lowerCL
-WaresAI_mcd$gp <- wbgCI$pTilde
+wbgCI <- adjustedWaldCI(early$EarlyRefined,early$total,0.05)
+early$gCIUpper <- wbgCI$upperCL
+early$gCILower <- wbgCI$lowerCL
+early$gp <- wbgCI$pTilde
 
-### F. Plot Data
+write.csv(early, "EarlyRef.csv")
 
-early <- WaresAI_mcd %>% filter(type=='EarlyRefined')
+# Plot Data
 
 set.seed(42)
 a<-ggplot(early, aes(x=early$blueMCD, y=early$gp, fill=early$Block))+
@@ -295,8 +307,16 @@ a<-ggplot(early, aes(x=early$blueMCD, y=early$gp, fill=early$Block))+
 a
 ggsave("MPAI_ByBlock_EarlyRefWBG.png", a, width=10, height=7.5, dpi=300)
 
+### F. Late #########
+late <- WaresAI_mcd %>% select(blueMCD, Block,DAACSPhase,WBGSum, LateRefined)
 
-late <- WaresAI_mcd %>% filter(type=='LateRefined')
+late <- late %>% mutate(total = LateRefined+WBGSum) %>% mutate(AI = LateRefined/total)
+
+#run function on all data
+wbgCI <- adjustedWaldCI(late$LateRefined,late$total,0.05)
+late$gCIUpper <- wbgCI$upperCL
+late$gCILower <- wbgCI$lowerCL
+late$gp <- wbgCI$pTilde
 
 set.seed(42)
 b<-ggplot(late, aes(x=late$blueMCD, y=late$gp, fill=late$Block))+
@@ -306,7 +326,7 @@ b<-ggplot(late, aes(x=late$blueMCD, y=late$gp, fill=late$Block))+
   ggtitle(expression(atop("Late Refined/WBG Index", atop(italic("95% Confidence Intervals"), "")))) + #set title
   theme_classic() +
   scale_y_continuous(limits=c(0.0,1), breaks=seq(0, 1, 0.25))+
-  scale_x_continuous(limits=c(1770,1830), breaks=seq(1770,1830,10)) +
+  scale_x_continuous(limits=c(1750,1830), breaks=seq(1750,1830,10)) +
   #  geom_text_repel(aes(label=ProjectName), size=5, color="black") +
   theme(axis.text=element_text(size=14,color="black"),
         axis.title=element_text(size=16,face="bold")) + theme(plot.title = element_text(size=18,face="bold")) +
@@ -314,7 +334,17 @@ b<-ggplot(late, aes(x=late$blueMCD, y=late$gp, fill=late$Block))+
 b
 ggsave("MPAI_ByBlock_LateRefWBG.png", b, width=10, height=7.5, dpi=300)
 
-french <- WaresAI_mcd %>% filter(type=='FrenchUtil')
+
+### G. French ########
+french <- WaresAI_mcd %>% select(blueMCD, Block,DAACSPhase,WBGSum, FrenchUtil)
+
+french <- french %>% mutate(total = FrenchUtil+WBGSum) %>% mutate(AI = FrenchUtil/total)
+
+#run function on all data
+wbgCI <- adjustedWaldCI(french$FrenchUtil,french$total,0.05)
+french$gCIUpper <- wbgCI$upperCL
+french$gCILower <- wbgCI$lowerCL
+french$gp <- wbgCI$pTilde
 
 set.seed(42)
 c<-ggplot(french, aes(x=french$blueMCD, y=french$gp, fill=french$Block))+
@@ -332,7 +362,17 @@ c<-ggplot(french, aes(x=french$blueMCD, y=french$gp, fill=french$Block))+
 c
 ggsave("MPAI_ByBlock_FrenchUtilWBG.png", c, width=10, height=7.5, dpi=300)
 
-local <- WaresAI_mcd %>% filter(type=='LocalUtil')
+
+### H. Local #########
+local <- WaresAI_mcd %>% select(blueMCD, Block,DAACSPhase,WBGSum, LocalUtil)
+
+local <- local %>% mutate(total = LocalUtil+WBGSum) %>% mutate(AI = LocalUtil/total)
+
+#run function on all data
+wbgCI <- adjustedWaldCI(local$LocalUtil,local$total,0.05)
+local$gCIUpper <- wbgCI$upperCL
+local$gCILower <- wbgCI$lowerCL
+local$gp <- wbgCI$pTilde
 
 set.seed(42)
 d<-ggplot(local, aes(x=local$blueMCD, y=local$gp, fill=local$Block))+
@@ -350,7 +390,16 @@ d<-ggplot(local, aes(x=local$blueMCD, y=local$gp, fill=local$Block))+
 d
 ggsave("MPAI_ByBlock_CaribWBG.png", d, width=10, height=7.5, dpi=300)
 
-other <- WaresAI_mcd %>% filter(type=='OtherUtil')
+### I. Other #######
+other <- WaresAI_mcd %>% select(blueMCD, Block,DAACSPhase,WBGSum, OtherUtil)
+
+other <- other %>% mutate(total = OtherUtil+WBGSum) %>% mutate(AI = OtherUtil/total)
+
+#run function on all data
+wbgCI <- adjustedWaldCI(other$OtherUtil,other$total,0.05)
+other$gCIUpper <- wbgCI$upperCL
+other$gCILower <- wbgCI$lowerCL
+other$gp <- wbgCI$pTilde
 
 set.seed(42)
 e<-ggplot(other, aes(x=other$blueMCD, y=other$gp, fill=other$Block))+
