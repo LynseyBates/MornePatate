@@ -246,16 +246,13 @@ WaresUnitAI_type <- WaresUnitAI %>% select(ProjectID, Block,DAACSPhase, FrenchUt
 ### C. Merge Glass and Cerm data ##########
 
 # Merge with Glass data
-WaresAI_glass <- merge(GlassSum, WaresUnitAI_type, by=c("Block","DAACSPhase", "ProjectID"), all=T)
+WaresAI_glass <- merge(GlassSum, WaresUnitAI_type, by=c("Block","DAACSPhase", "ProjectID"))
 
 WaresAI_glass$DAACSPhase[WaresAI_glass$DAACSPhase == ''] <- NA
 WaresAI_glass$Block[WaresAI_glass$Block == ''] <- NA
 
 WaresAI_glass2 <- filter(WaresAI_glass, ! is.na(Block))
 WaresAI_glass3 <- filter(WaresAI_glass2, ! is.na(DAACSPhase))
-
-WaresAI_glass3$WBGSum[is.na(WaresAI_glass3$WBGSum)] <- 0
-
 
 ### D. Bring in MCD data ##########
 WaresAI_glass3$ProjPhase <- paste(WaresAI_glass3$ProjectID, WaresAI_glass3$DAACSPhase, sep="_")
@@ -287,7 +284,10 @@ early$gCIUpper <- wbgCI$upperCL
 early$gCILower <- wbgCI$lowerCL
 early$gp <- wbgCI$pTilde
 
-write.csv(early, "EarlyRef.csv")
+early$gp[early$EarlyRefined == 0] <- 0
+
+
+#write.csv(early, "EarlyRef.csv")
 
 # Plot Data
 
@@ -318,6 +318,9 @@ late$gCIUpper <- wbgCI$upperCL
 late$gCILower <- wbgCI$lowerCL
 late$gp <- wbgCI$pTilde
 
+late$gp[late$LateRefined == 0] <- 0
+
+
 set.seed(42)
 b<-ggplot(late, aes(x=late$blueMCD, y=late$gp, fill=late$Block))+
   geom_point(shape=21, size=5, alpha = .75, colour="black")+
@@ -345,6 +348,8 @@ wbgCI <- adjustedWaldCI(french$FrenchUtil,french$total,0.05)
 french$gCIUpper <- wbgCI$upperCL
 french$gCILower <- wbgCI$lowerCL
 french$gp <- wbgCI$pTilde
+
+french$gp[french$FrenchUtil == 0] <- 0
 
 set.seed(42)
 c<-ggplot(french, aes(x=french$blueMCD, y=french$gp, fill=french$Block))+
@@ -374,6 +379,9 @@ local$gCIUpper <- wbgCI$upperCL
 local$gCILower <- wbgCI$lowerCL
 local$gp <- wbgCI$pTilde
 
+local$gp[local$LocalUtil == 0] <- 0
+
+
 set.seed(42)
 d<-ggplot(local, aes(x=local$blueMCD, y=local$gp, fill=local$Block))+
   geom_point(shape=21, size=5, alpha = .75, colour="black")+
@@ -400,6 +408,8 @@ wbgCI <- adjustedWaldCI(other$OtherUtil,other$total,0.05)
 other$gCIUpper <- wbgCI$upperCL
 other$gCILower <- wbgCI$lowerCL
 other$gp <- wbgCI$pTilde
+
+other$gp[other$OtherUtil == 0] <- 0
 
 set.seed(42)
 e<-ggplot(other, aes(x=other$blueMCD, y=other$gp, fill=other$Block))+
