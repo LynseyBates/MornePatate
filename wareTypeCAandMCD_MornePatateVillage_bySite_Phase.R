@@ -22,7 +22,7 @@ library(viridis)
 
 #source('credentials')
 
-tell DBI which driver to use
+#tell DBI which driver to use
 pgSQL <- dbDriver("PostgreSQL")
 # establish the connection
 DRCcon<-dbConnect(pgSQL, host='drc.iath.virginia.edu', port='5432',
@@ -129,6 +129,27 @@ wareTypeData <- mutate(wareTypeData, Ware=ifelse(Ware == 'Morne Patate Type 1a',
 wareTypeData <- mutate(wareTypeData, Ware=ifelse(Ware == 'Morne Patate Type 1', 
                                                  'Morne Patate Type 1 Combined', Ware))
 
+# Split Quad ID N and E
+wareTypeDataSTP <- wareTypeData %>% filter(MasterContextNumber=='STP')
+
+# Remove Ns
+wareTypeDataSTP <- wareTypeDataSTP %>% separate(QuadratID, c("N", "E"), "E")
+wareTypeDataSTP <- wareTypeDataSTP %>% separate(N, c("X", "N"), "N")
+
+wareTypeDataSTP$MasterContextNumber <- NA
+
+wareTypeDataSTP$MasterContextNumber[wareTypeDataSTP$N > 4590 & wareTypeDataSTP$E >6554 ] <- 'BlockA'
+
+wareTypeDataSTP$MasterContextNumber[wareTypeDataSTP$E >6655 ] <- 'BlockC'
+
+wareTypeDataSTP$MasterContextNumber[wareTypeDataSTP$N < 4594 & wareTypeDataSTP$E < 6596 ] <- 'BlockG'
+
+wareTypeDataSTP$MasterContextNumber[(wareTypeDataSTP$N < 4594 & wareTypeDataSTP$N >= 4555) & (wareTypeDataSTP$E <= 6655 & wareTypeDataSTP$E > 6590) ] <- 'BlockB'
+
+wareTypeDataSTP$MasterContextNumber[(wareTypeDataSTP$N <= 4551) & (wareTypeDataSTP$E < 6660 & wareTypeDataSTP$E > 6596) ] <- 'BlockD'
+
+wareTypeData <- filter(wareTypeData, ! MasterContextNumber=='STP')
+wareTypeData <- bind_rows(wareTypeData,wareTypeDataSTP)
 
 
 #### 4. Do a quick summary of the new ware type totals. ####
@@ -462,7 +483,7 @@ rowScoresX <- merge(rowScores, Block, by="unit")
 library(ggrepel)
 set.seed(42)
 p1 <- ggplot(rowScoresX, aes(x=Dim1,y=Dim2, fill=MasterContextNumber))+
-  geom_point(shape=21, size=5, colour="black", fill="cornflower blue")+
+  geom_point(shape=21, size=5, colour="black")+
   # geom_text(aes(label= unit,vjust=-.6, cex=5) +
   geom_text_repel(aes(label= unit), cex = 4) +
   labs(title="Morne Patate Village", 
