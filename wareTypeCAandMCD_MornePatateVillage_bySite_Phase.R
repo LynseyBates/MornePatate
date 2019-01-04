@@ -729,7 +729,21 @@ CA_MCD_Phase3 <- CA_MCD2 %>% mutate( Phase = case_when (Dim1 <= -1 ~ 'P02',
   Dim1 > 1 ~ 'P04'
 ))
 
-CA_MCD_Phase4 <- rbind(CA_MCD_Phase3, CA_MCD_Phase2, by="unit")
+CA_MCD_Phase4 <- bind_rows(CA_MCD_Phase3, CA_MCD_Phase2)
+
+# BlueMCD By Dim1 plot by Phase
+# This one uses DAACS Website colors 
+
+p6 <- ggplot(CA_MCD_Phase4,aes(x = Dim1, y = blueMCD, 
+                              fill= Phase)) +
+  #scale_y_continuous(limits=c(1750, 1950)) +
+  geom_point(shape=21,  alpha = .75, size= 6)  + 
+  scale_fill_manual(name="DAACS Phase",
+                    labels=c("P01", "P02", "P03","P04"),
+                    values=c("skyblue", "blue", "darkblue","black")) + 
+  geom_text_repel(aes(label= unit), cex=4) +
+  labs(title="Morne Patate Estate", x="Dimension 1", y="BLUE MCD")
+p6
 
 # join the Phases to the ware by unit data
 unitPhase <- select(CA_MCD_Phase4, unit, Phase) 
@@ -758,36 +772,6 @@ MCDByPhase<-EstimateMCD(dataForMCD_Phase$unitData,
 
 # let's see what it looks like
 MCDByPhase
-
-
-
-# BlueMCD By Dim1 plot by Phase
-# This one uses DAACS Website colors 
-
-p6a <- ggplot(CA_MCD_Phase,aes(x = Dim1, y = blueMCD, 
-                              fill= Phase)) +
-  #scale_y_continuous(limits=c(1750, 1950)) +
-  geom_point(shape=21,  alpha = .75, size= 6)  + 
-  scale_fill_manual(name="DAACS Phase",
-                      labels=c("P01", "P02", "P03"),
-                      values=c("skyblue", "blue", "darkblue")) + 
-  geom_text_repel(aes(label= unit), cex=4) +
-  labs(title="Morne Patate Village", x="Dimension 1", y="BLUE MCD")
-p6a
-
-# And here we use viridis colors (for color blind)
-p6b <- ggplot(CA_MCD_Phase,aes(x = Dim1,y = blueMCD, fill= factor(Phase))) +
-  #scale_y_continuous(limits=c(1760, 1920)) +
-  geom_point(shape=21,  alpha = .75, size= 6)  + 
-  scale_fill_viridis(discrete= T, name="DAACS Phase",
-                     labels=c("P01", "P02", "P03")) + 
-  #geom_text_repel(aes(label= unit), cex=4) +
-  labs(title="Morne Patate Village", x="Dimension 1", y="BLUE MCD")
-p6b
-
-# ggsave("MPvillage_Dim1MCDcolor_2018.png", p6, width=10, height=7.5, dpi=300)
-
-
 
 
 #### 17. Write out contexts and phase assignments #####
