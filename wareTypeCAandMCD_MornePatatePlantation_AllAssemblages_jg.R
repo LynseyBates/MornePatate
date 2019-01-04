@@ -487,7 +487,7 @@ p1 <- ggplot(rowScores, aes(x=Dim1,y=Dim2, fill= Project))+
        )
 p1
 #save the plot for website chronology page/presentations
-#ggsave("Site 6_Figure1Dim1Dim2_2018cxt.png", p1, width=10, height=7.5, dpi=300)
+ggsave("01_Figure1Dim1Dim2.png", p1, width=10, height=7.5, dpi=300)
 
 #ggplot version of col scores dim 1 and dim 2
 p2 <- ggplot(colScores, aes(x = Dim1,y = Dim2))+
@@ -500,7 +500,7 @@ p2 <- ggplot(colScores, aes(x = Dim1,y = Dim2))+
         )  
 p2
 #save the plot for website chronology page/presentations
-#ggsave("Site 6_Figure2WareTypes_2018cxt.png", p2, width=10, height=7.5, dpi=300)
+ggsave("02_Figure2WareTypes.png", p2, width=10, height=7.5, dpi=300)
 
 
 # sort the data matrix that went into the CA on the dim1 scores and do a 
@@ -536,7 +536,7 @@ labs(title="Morne Patate Plantation",
      y="BLUE MCD") 
 p3 
 # save the plot for website chronology page/presentations
-# ggsave("Site 6_Dim1BLUEMCD_2018cxt.png", p3, width=10, height=7.5, dpi=300)
+ggsave("03_Dim1BLUEMCD.png", p3, width=10, height=7.5, dpi=300)
 
 p4 <- ggplot(CA_MCD, aes(x = Dim2,y = blueMCD))+
 geom_point(shape=21, size=5, colour="black", fill="cornflower blue")+
@@ -553,11 +553,12 @@ p4
 # Dim 1 Scores Weighted Histogram, you may need to change scale
 dim1ForHist<- data.frame(dim1 = rep(CA_MCD$Dim1, CA_MCD$Count))
 p5 <- ggplot(dim1ForHist, aes(x = dim1)) +
-      geom_histogram(aes(y=..density..), colour="black", fill="tan", binwidth=0.2, 
+      geom_histogram(aes(y=..density..), colour="black", fill="tan", binwidth=0.1, 
                   boundary= .1) +
       labs(title="Morne Patate Plantation", x="Dimension 1", y="Density") +
       geom_density(fill=NA)
 p5
+ggsave("05_Histogram.png", p5, width=10, height=7.5, dpi=300)
 
 
 # Add lines for phase breaks
@@ -565,15 +566,28 @@ p5a <- p5 + geom_vline(xintercept=c(.8), colour = "gray", linetype = "dashed",
             size=1)
 p5a
 
-#### 16. Chop off the assemblages that are early ####
-# those that have Dim 1 scores > .8 on the foregoing CA
+#### Do the Dim 1 -  MCD scatterplot with Phase assignments  
+CA_MCD_Phase <- CA_MCD %>% mutate( Phase = case_when (Dim1 > .8 ~ 'P01'))
+#   (Dim1 > -3) & 
+#  (Dim1 <= 0) ~ 'P02',
+#  Dim1 > 0 ~ 'P03'
+#))
 
-laterUnits <- CA_MCD %>% filter(Dim1 <= .8 ) %>% select(unit) 
+# filter out the contexts with NA phases
+CA_MCD_Phase2 <- filter(CA_MCD_Phase, !is.na(Phase))
 
 
-wareByUnitT_forCA_Late <- inner_join(laterUnits, wareByUnitT_forCA,  by= 'unit')
 
-write.csv(wareByUnitT_forCA_Late, file='LateWares.csv')
+####Section 7: Rerun CA without tail #######################
+
+# Remove contexts assigned to P01
+WareByUnitTY <- anti_join(wareByUnitT_forCA, CA_MCD_Phase2, by='unit')
+
+
+WareByUnitTY <- WareByUnitTY %>% filter(
+  unit != '062.5364')
+
+# Summary(ca1) - inertia plot with broken stick
 
 #remove ware types with <=5 sherds. For this round, CP and
 badVars1 <- c(
@@ -582,8 +596,8 @@ badVars1 <- c(
   'White Salt Glaze'
 )
 
-goodVars1 <- !names(wareByUnitT_forCA_Late) %in% badVars1
-wareByUnitT_forCA_Late1 <- wareByUnitT_forCA_Late[,goodVars1] 
+goodVars1 <- !names(WareByUnitTY) %in% badVars1
+wareByUnitT_forCA_Late1 <- WareByUnitTY[,goodVars1] 
 
 
 matX <- as.matrix(wareByUnitT_forCA_Late1[,-1]) 
@@ -650,7 +664,7 @@ p1 <- ggplot(rowScores1, aes(x=Dim1,y=Dim2, fill= Project))+
   geom_point(shape=21, size=5, colour="black", alpha=.5) +
   scale_fill_viridis(discrete =T) +
   # geom_text(aes(label= unit,vjust=-.6, cex=5) +
-  # geom_text_repel(aes(label= unit), cex = 4) +
+   geom_text_repel(aes(label= unit), cex = 4) +
   labs(title="Morne Patate Plantation", 
        x = paste ("Dimension 1",":  ", round(inertia[1,]*100),'%', sep=''), 
        y= paste ("Dimension 2",":  ", round(inertia[2,]*100),'%', sep='')
@@ -722,36 +736,34 @@ p5a <- p5 + geom_vline(xintercept=c(-.9,0,1), colour = "gray", linetype = "dashe
                        size=1)
 p5a
 
-
-
-
-
 #### 16.  Do the Dim 1 -  MCD scatterplot with Phase assignments  
 # Do the Phase assigments, based on the Dim1 scores
-CA_MCD_Phase <- CA_MCD1 %>% mutate( Phase = case_when (Dim1 <= -.9 ~ 'P02',
+CA_MCD_Phase <- CA_MCD1 %>% mutate( Phase = case_when (Dim1 <= -.9 ~ 'P05',
                                       (Dim1 > -.9) & 
-                                      (Dim1 <= 0) ~ 'P03',
+                                      (Dim1 <= 0) ~ 'P04',
                                       (Dim1 > 0) & 
-                                        (Dim1 <= 1) ~ 'P04',
-                                       Dim1 > 1 ~ 'P05'
+                                        (Dim1 <= 1) ~ 'P03',
+                                       Dim1 > 1 ~ 'P02'
                                       ))
 
+CA_MCD_Phase3 <- bind_rows(CA_MCD_Phase, CA_MCD_Phase2)
+                                                       
 # BlueMCD By Dim1 plot by Phase
 # This one uses DAACS Website colors 
 
-p6 <- ggplot(CA_MCD_Phase,aes(x = Dim1, y = blueMCD, 
+p6 <- ggplot(CA_MCD_Phase3,aes(x = Dim1, y = blueMCD, 
                               fill= Phase)) +
   #scale_y_continuous(limits=c(1750, 1950)) +
   geom_point(shape=21,  alpha = .75, size= 6)  + 
   scale_fill_manual(name="DAACS Phase",
-                      labels=c("P02", "P03", "P04","P05"),
-                      values=c("skyblue", "blue", "darkblue", "black")) + 
+                      labels=c("P01", "P02", "P03", "P04","P05"),
+                      values=c("grey","skyblue", "blue", "darkblue", "black")) + 
   geom_text_repel(aes(label= unit), cex=4) +
   labs(title="Morne Patate Plantation", x="Dimension 1", y="BLUE MCD")
 p6
 
 # And here we use viridis colors (for color blind)
-p6 <- ggplot(CA_MCD_Phase,aes(x = Dim1,y = blueMCD, fill= factor(Phase))) +
+p6 <- ggplot(CA_MCD_Phase3,aes(x = Dim1,y = blueMCD, fill= factor(Phase))) +
   #scale_y_continuous(limits=c(1760, 1920)) +
   geom_point(shape=21,  alpha = .75, size= 6)  + 
   scale_fill_viridis(discrete= T, name="DAACS Phase",
@@ -766,7 +778,7 @@ p6
 ##### 16. Compute the MCDs and TPQs for the phases
 
 # join the Phases to the ware by unit data
-unitPhase <- select(CA_MCD_Phase, unit, Phase) 
+unitPhase <- select(CA_MCD_Phase3, unit, Phase) 
 
 wareByUnit_Phase<- left_join (wareTypeData_Unit, unitPhase, by = 'unit') %>%
                     mutate(Phase = ifelse(is.na(Phase),'',Phase))
